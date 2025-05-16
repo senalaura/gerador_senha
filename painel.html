@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Painel de Chamadas</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #7CF8A7, #F4F77E);
+      overflow: hidden;
+    }
+    .painel-container {
+      display: flex;
+      height: 100vh;
+    }
+    .atual {
+      width: 65%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      background: #fff;
+      border-right: 3px solid #ddd;
+      position: relative;
+    }
+    .atual .info-box {
+      width: 90%;
+      border-radius: 30px;
+      padding: 40px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.1);
+      font-size: 1.4em;
+      font-weight: bold;
+      background-color: #f0f0f0;
+      transition: background-color 0.3s;
+    }
+    .info-box.azul {
+      background-color: #3D9BC4;
+      color: white;
+    }
+    .info-box.amarelo {
+      background-color: #F2C744;
+      color: black;
+    }
+    .anteriores {
+      width: 35%;
+      padding: 30px;
+      background: linear-gradient(to right, #f0f0f0, #e4f7e5);
+      display: flex;
+      flex-direction: column;
+    }
+    .titulo {
+      font-size: 1.5em;
+      font-weight: bold;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .senha {
+      padding: 12px;
+      margin-bottom: 8px;
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 0 6px rgba(0,0,0,0.08);
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      font-size: 1em;
+    }
+    .senha.azul {
+      background-color: #3D9BC4;
+      color: white;
+    }
+    .senha.amarelo {
+      background-color: #F2C744;
+      color: black;
+    }
+    #relogio {
+      position: absolute;
+      top: 10px;
+      left: 30px;
+      font-weight: bold;
+      font-size: 1.2em;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 5px;
+    }
+    .sem-paciente {
+      font-size: 1.5em;
+      color: #999;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<audio id="somChamada" src="https://cdn.pixabay.com/download/audio/2022/03/24/audio_67e3fb15f5.mp3?filename=ding-dong-2-7056.mp3"></audio>
+<div class="painel-container">
+  <div class="atual">
+    <div id="relogio"></div>
+    <div id="senha-atual" class="info-box">
+      <div class="sem-paciente">Nenhum paciente na fila.</div>
+    </div>
+  </div>
+  <div class="anteriores">
+    <div class="titulo">Senhas Chamadas</div>
+    <div id="senhas-anteriores"></div>
+  </div>
+</div>
+<script>
+  const mapEspecialidades = {
+    CG: 'Clínica Geral',
+    GIN: 'Ginecologia',
+    PED: 'Pediatria',
+    GER: 'Geriatria',
+    ORT: 'Ortopedia'
+  };
+  function calcularTempoRestante() {
+    const ultimaChamadaTime = parseInt(localStorage.getItem('ultimaChamadaTime')) || Date.now();
+    const agora = Date.now();
+    return Math.max(0, 300 - Math.floor((agora - ultimaChamadaTime) / 1000));
+  }
+  function atualizarRelogio() {
+    const agora = new Date();
+    const tempoRestante = calcularTempoRestante();
+    document.getElementById("relogio").innerHTML = `
+      <div>${agora.toLocaleTimeString()}</div>
+      <div id="contador">Próxima chamada em: <strong>${formatarTempo(tempoRestante)}</strong></div>
+    `;
+  }
+  function formatarTempo(segundos) {
+    const m = String(Math.floor(segundos / 60)).padStart(2, '0');
+    const s = String(segundos % 60).padStart(2, '0');
+    return `${m}:${s}`;
+  }
+  function iniciarContador() {
+    setInterval(() => atualizarRelogio(), 1000);
+  }
+  function falarPaciente(paciente) {
+    const som = document.getElementById("somChamada");
+    som.currentTime = 0;
+    som.play().then(() => {
+      setTimeout(() => {
+        const msg = new SpeechSynthesisUtterance(`Senha ${paciente.senha}, paciente ${paciente.nome}`);
+        msg.lang = 'pt-BR';
+        window.speechSynthesis.speak(msg);
+      }, 1200);
+    }).catch(e => console.error('Erro ao tocar som:', e));
+  }
+  function atualizarPainel() {
+    const chamadas = JSON.parse(localStorage.getItem('chamadas')) || [];
+    const atual = chamadas[chamadas.length - 1];
+    const anteriores = chamadas.slice(0, -1).reverse();
+    const atualDiv = document.getElementById("senha-atual");
+    if (atual) {
+      atualDiv.className = `info-box ${atual.tipo === 'Preferencial' ? 'amarelo' : 'azul'}`;
+      atualDiv.innerHTML = `
+        Nome: ${atual.nome}<br/>
+        Senha: ${atual.senha} | ${atual.tipo}<br/>
+        Consulta: ${mapEspecialidades[atual.especialidade] || atual.especialidade}<br/>
+        Data: ${atual.data}<br/>
+        Hora: ${atual.hora}`;
+      falarPaciente(atual);
+    } else {
+      atualDiv.className = 'info-box';
+      atualDiv.innerHTML = `<div class="sem-paciente">Nenhum paciente na fila.</div>`;
+    }
+    const anterioresDiv = document.getElementById("senhas-anteriores");
+    anterioresDiv.innerHTML = '';
+    anteriores.forEach(p => {
+      const div = document.createElement("div");
+      div.className = `senha ${p.tipo === 'Preferencial' ? 'amarelo' : 'azul'}`;
+      div.innerHTML = `
+        ${p.senha} - ${p.nome}
+        <span>${p.hora}</span>`;
+      anterioresDiv.appendChild(div);
+    });
+  }
+  window.addEventListener('storage', (e) => {
+    if (["chamadas", "filaPreferencial", "filaNormal"].includes(e.key)) {
+      atualizarPainel();
+    }
+  });
+  atualizarRelogio();
+  iniciarContador();
+  atualizarPainel();
+</script>
+</body>
+</html>

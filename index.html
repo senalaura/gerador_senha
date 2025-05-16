@@ -1,0 +1,262 @@
+<!DOCTYPE html> 
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guichê de Atendimento</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #7CF8A7, #F4F77E);
+    }
+    .container {
+      max-width: 1000px;
+      margin: 30px auto;
+      background: #f6fff1;
+      border-radius: 30px;
+      padding: 30px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+    button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      font-weight: bold;
+      font-size: 16px;
+      background-color: #4B7C3F;
+      color: white;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    .fila-container {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 30px;
+      gap: 20px;
+    }
+    .fila {
+      flex: 1;
+      background: #e6f0ff;
+      border-radius: 15px;
+      padding: 15px;
+      min-height: 100px;
+    }
+    .fila h3 {
+      text-align: center;
+    }
+    .paciente {
+      padding: 10px;
+      background: white;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      font-weight: bold;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    .display-senha {
+      background: white;
+      padding: 25px;
+      border-radius: 20px;
+      margin-top: 30px;
+      font-size: 1.2em;
+      font-weight: bold;
+      text-align: center;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    #autoTimer {
+      font-weight: bold;
+      text-align: center;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Guichê de Atendimento Hospitalar</h1>
+  <label for="nome">Nome do Paciente:</label>
+  <input type="text" id="nome" placeholder="Nome completo">
+  <label for="tipo">Tipo de Atendimento:</label>
+  <select id="tipo">
+    <option value="Normal">Normal</option>
+    <option value="Preferencial">Preferencial</option>
+  </select>
+  <label for="especialidade">Especialidade:</label>
+  <select id="especialidade">
+    <option value="CG">Clínica Geral</option>
+    <option value="GIN">Ginecologia</option>
+    <option value="PED">Pediatria</option>
+    <option value="GER">Geriatria</option>
+    <option value="ORT">Ortopedia</option>
+  </select>
+  <button onclick="gerarSenha()">Gerar Senha</button>
+  <button onclick="chamarProximoGuiche(1)">Chamar Guichê 1</button>
+  <button onclick="chamarProximoGuiche(2)">Chamar Guichê 2</button>
+  <div class="fila-container">
+    <div class="fila">
+      <h3>Fila Normal</h3>
+      <div id="fila-normal"></div>
+    </div>
+    <div class="fila">
+      <h3>Fila Preferencial</h3>
+      <div id="fila-preferencial"></div>
+    </div>
+  </div>
+
+  <div class="display-senha" id="guiches-container" style="display: flex; justify-content: space-between; gap: 20px;">
+    <div class="display-senha" id="guiche1" style="flex: 1;">
+      Nenhum paciente chamado ainda.
+    </div>
+    <div class="display-senha" id="guiche2" style="flex: 1;">
+      Nenhum paciente chamado ainda.
+    </div>
+  </div>
+
+  <div id="autoTimer" style="text-align: center; margin-top: 10px; display: flex; justify-content: space-around;">
+    <div><strong>Guichê 1</strong> - Próxima chamada automática em: <span id="timer1">05:00</span></div>
+    <div><strong>Guichê 2</strong> - Próxima chamada automática em: <span id="timer2">05:00</span></div>
+  </div>
+</div>
+
+<script>
+const mapEspecialidades = {
+  CG: 'Clínica Geral',
+  GIN: 'Ginecologia',
+  PED: 'Pediatria',
+  GER: 'Geriatria',
+  ORT: 'Ortopedia'
+};
+
+function getContadores() {
+  return JSON.parse(localStorage.getItem('contadoresEspecialidades') || '{}');
+}
+
+function setContadores(data) {
+  localStorage.setItem('contadoresEspecialidades', JSON.stringify(data));
+}
+
+function formatarTempo(segundos) {
+  const m = String(Math.floor(segundos / 60)).padStart(2, '0');
+  const s = String(segundos % 60).padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function calcularTempoRestanteGuiche(guiche) {
+  const ultima = parseInt(localStorage.getItem('ultimaChamadaTimeGuiche' + guiche)) || Date.now();
+  const agora = Date.now();
+  return Math.max(0, 300 - Math.floor((agora - ultima) / 1000));
+}
+
+let timerStartTimes = {1: Date.now(), 2: Date.now()};
+function iniciarTimerGuiche(guiche) {
+  setInterval(() => {
+    const restante = calcularTempoRestanteGuiche(guiche);
+    document.getElementById('timer' + guiche).textContent = formatarTempo(restante);
+    if (restante <= 0) {
+      chamarProximoGuiche(guiche);
+      localStorage.setItem('ultimaChamadaTimeGuiche' + guiche, Date.now());
+    timerStartTimes[guiche] = Date.now();
+    }
+  }, 1000);
+}
+
+function chamarProximoGuiche(guiche) {
+  const filaPreferencial = JSON.parse(localStorage.getItem('filaPreferencial') || '[]');
+  const filaNormal = JSON.parse(localStorage.getItem('filaNormal') || '[]');
+  let proximo = null;
+
+  if (filaPreferencial.length > 0) {
+    proximo = filaPreferencial.shift();
+    localStorage.setItem('filaPreferencial', JSON.stringify(filaPreferencial));
+  } else if (filaNormal.length > 0) {
+    proximo = filaNormal.shift();
+    localStorage.setItem('filaNormal', JSON.stringify(filaNormal));
+  }
+
+  if (proximo) {
+    localStorage.setItem('ultimaChamadaTimeGuiche' + guiche, Date.now());
+    const chamadas = JSON.parse(localStorage.getItem('chamadas') || '[]');
+    chamadas.push(proximo);
+    if (chamadas.length > 10) chamadas.shift();
+    localStorage.setItem('chamadas', JSON.stringify(chamadas));
+    document.getElementById(`guiche${guiche}`).innerHTML = `
+      Nome: ${proximo.nome}<br/>
+      Senha: ${proximo.senha} | ${proximo.tipo}<br/>
+      Consulta: ${mapEspecialidades[proximo.especialidade] || proximo.especialidade}<br/>
+      Data: ${proximo.data}<br/>
+      Hora: ${proximo.hora}`;
+  } else {
+    document.getElementById(`guiche${guiche}`).innerHTML = `Nenhum paciente na fila.`;
+  }
+
+  atualizarFilas();
+}
+
+function gerarSenha() {
+  const nome = document.getElementById('nome').value.trim();
+  const tipo = document.getElementById('tipo').value;
+  const especialidade = document.getElementById('especialidade').value;
+  if (!nome) return alert("Digite o nome do paciente.");
+  const contadores = getContadores();
+  contadores[especialidade] = (contadores[especialidade] || 0) + 1;
+  if (contadores[especialidade] > 20) return alert("Limite de pacientes atingido para esta especialidade hoje.");
+  const senha = `${especialidade}${String(contadores[especialidade]).padStart(3, '0')}`;
+  setContadores(contadores);
+  const data = new Date();
+  const paciente = {
+    nome,
+    tipo,
+    especialidade,
+    senha,
+    data: data.toLocaleDateString(),
+    hora: data.toLocaleTimeString()
+  };
+  const filaKey = tipo === "Preferencial" ? 'filaPreferencial' : 'filaNormal';
+  const fila = JSON.parse(localStorage.getItem(filaKey) || '[]');
+  fila.push(paciente);
+  localStorage.setItem(filaKey, JSON.stringify(fila));
+  atualizarFilas();
+  document.getElementById('nome').value = '';
+}
+
+function atualizarFilas() {
+  const normalDiv = document.getElementById('fila-normal');
+  const preferencialDiv = document.getElementById('fila-preferencial');
+  normalDiv.innerHTML = '';
+  preferencialDiv.innerHTML = '';
+  JSON.parse(localStorage.getItem('filaNormal') || '[]').forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'paciente';
+    div.textContent = `${p.senha} - ${p.nome}`;
+    normalDiv.appendChild(div);
+  });
+  JSON.parse(localStorage.getItem('filaPreferencial') || '[]').forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'paciente';
+    div.textContent = `${p.senha} - ${p.nome}`;
+    preferencialDiv.appendChild(div);
+  });
+}
+
+iniciarTimerGuiche(1);
+iniciarTimerGuiche(2);
+atualizarFilas();
+</script>
+</body>
+</html>
